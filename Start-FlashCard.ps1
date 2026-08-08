@@ -2,7 +2,7 @@
 
 # spmather
 # 2026-08-07
-# v1.0.0
+# v1.0.1
 
 # I have not tested in Windows
 
@@ -19,7 +19,7 @@ your questions in a flash card style question and answer.
 Score is tallied as pass for 1 point and fail for 0 point.
 
 Flash cards are sequential by default.  Exit and use 
-Start-FlashCards -FilePath /path/to/csv -Randomize
+Start-FlashCards -FilePath /path/to/csv -RandomizeOrder
 to randomize the order.
 
 If you need to exit, please enter the word "Exit" to return
@@ -41,12 +41,23 @@ function Format-Text($String) {
 }
 
 function Show-EndText {
+
+    if ($CardCount -eq 0) {
+        $FinalScore = 0
+    }
+    elseif ($Null -eq $CardCount) {
+        $FinalScore = 0
+    }
+    elseif ($CardCount -ge 1) {
+        $FinalScore = $Score / $CardCount
+    }
+    
     Write-Output `
 @"
 Thank you for playing flash cards!
 
 Your final score is:  [$($Score)] out of [$($CardCount)] total
-Your percent score is:  [$(($Score / $CardCount) * 100)]"
+Your percent score is:  [$($FinalScore * 100)]"
 Your score was saved to [$($PSScriptRoot)/Scores.txt]
 
 
@@ -163,6 +174,7 @@ function Start-FlashCard {
 
     begin {
 
+        # Add error correction for not finding a csv file
 
         $ColorList = @(
             "Black","DarkBlue","DarkGreen","DarkCyan","DarkRed","DarkMagenta",
@@ -171,30 +183,47 @@ function Start-FlashCard {
         )
 
         $FlashCardContent    = Get-Content -Path $FilePath
-        $NumberOfItemsInData = (Get-Content $FilePath).Length
-        
-        if ($Null -eq $CardCount) {
-            $CardCount = $NumberOfItemsInData
-        }
+        $NumberOfItemsInData = (Get-Content -Path $FilePath).Length
 
-        # Fixes division by 0 issue
-        if ($FlashCardContent[0] -ne 'Term,Definition') {                            # implies gc 1 line minimum and CardCount is 1
-            if ($NumberOfItemsInData = 1) {
-                $CardCount = 1
+
+        # I really don't know why I had to make this switch, but $CardCount somewhere in scripting changed from default $null to 0
+        # It used to be a simple if ($null -eq $CardCount) {make it the count of the file}
+        # Then I had issues with a single line file cause of indexes starting at 0, which made both a division by 0 issue and immediate
+        # failure due to 0 items to print to host.  After longer than I would like to admit, this is the only way I got it to work.
+        # I also have to set it to a minimum of 1 to avoid division by 0 errors despite exiting immediately after.
+        switch ($NumberOfItemsInData) {
+            0 {
+                $CardCount = 1  
+                Write-Output "File is empty"
+                Exit
             }
+            1 {
+                $CardCount = 1  
+                Write-Output "File is empty or too small to process"
+                Exit
+            }
+            Default {
+                if ($NumberOfItemsInData -ge 2) {
+                    if ($Null -eq $CardCount) {
+                        $CardCount = $NumberOfItemsInData
+                    }
+                    elseif ($CardCount -eq 0) {
+                        $CardCount = $NumberOfItemsInData
+                    }
+                }
+            }
+        }
+        
+        if ($FlashCardContent[0] -ne 'Term,Definition') {
             $FlashCardCSV = Import-Csv -Path $FilePath -Header "Term","Definition"
         }
-        elseif ($FlashCardContent[0] -eq 'Term,Definition') {                       # implies gc 2 line minimum and CardCount is 1
-            if ($NumberOfItemsInData = 2) {
-                $CardCount = 1
-            }
+        elseif ($FlashCardContent[0] -eq 'Term,Definition') {
             $FlashCardCSV = Import-Csv -Path $FilePath
         }
         else {
             Write-Output "Could not locate the path to the FlashCard data file (CSV format)."
             Write-Output "Path to the file was input as [$($FilePath)]"
         }
-        Remove-Variable -Name "FlashCardContent"
 
         switch ($Difficulty) {
             "Easy" {
@@ -257,25 +286,36 @@ function Start-FlashCard {
 
                 # Calculate response against answer
                 $Result = ./pstr.py pstr $Answer $Response
-                Format-Text("You're score is this close to the answer [$($Result)] and you needed [$($Threshold)]")
+                Format-Text("Your score is this close to the answer [$($Result)] and you needed [$($Threshold)]")
                 
                 # Score
                 if ($Result -gt $Threshold) {  # Update pass/fail to cumulative
                     Format-Text("The answer is [$($Answer)]")
                     Format-Text("Congratulations, you have earned a point")
-                    Show-ProgressSpinner -SpinCount 10 -SpinWaitInMilliseconds 100 -Color $SpinnerColor
+                    Show-ProgressSpinner -SpinCount 20 -SpinWaitInMilliseconds 100 -Color $SpinnerColor
                     $Score += 1
                 }
                 elseif ($Result -le $Threshold) {
                     Format-Text("I'm sorry, this is not the correct answer")
                 }
 
-                Start-Sleep -Seconds 5
+                Start-Sleep -Seconds 2
                 Clear-Host
             }
         }
     }
     end {
+
+        if ($CardCount -eq 0) {
+            $FinalScore = 0
+        }
+        elseif ($Null -eq $CardCount) {
+            $FinalScore = 0
+        }
+        elseif ($CardCount -ge 1) {
+            $FinalScore = $Score / $CardCount
+        }
+        
         Clear-Host
         Show-EndText
         for ($i ; $i -lt 20 ; $i++) {
@@ -284,7 +324,7 @@ function Start-FlashCard {
         }
         Write-Output "[$(Get-Date)] with quiz name [$($FilePath)]" | Out-File $PSScriptRoot/Scores.txt -Append
         Write-Output "Your final score is:  [$($Score)] out of [$($CardCount)] total" | Out-File $PSScriptRoot/Scores.txt -Append
-        Write-Output "Your percent score is:  [$(($Score / $CardCount) * 100)]" | Out-File $PSScriptRoot/Scores.txt -Append
+        Write-Output "Your percent score is:  [$($FinalScore * 100)]" | Out-File $PSScriptRoot/Scores.txt -Append
         Write-Output "" | Out-File $PSScriptRoot/Scores.txt -Append
     }
 }
