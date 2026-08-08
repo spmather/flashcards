@@ -220,10 +220,20 @@ function Start-FlashCard {
             Default {
                 if ($NumberOfItemsInData -gt 2) {
                     if ($Null -eq $CardCount) {
-                        $CardCount = $NumberOfItemsInData
+                        if ($FlashCardContent[0] -ne 'Term,Definition') {
+                            $CardCount = $NumberOfItemsInData
+                        }
+                        elseif ($FlashCardContent[0] -eq 'Term,Definition') {
+                            $CardCount = $NumberOfItemsInData - 1
+                        }
                     }
                     elseif ($CardCount -eq 0) {
-                        $CardCount = $NumberOfItemsInData
+                        if ($FlashCardContent[0] -ne 'Term,Definition') {
+                            $CardCount = $NumberOfItemsInData
+                        }
+                        elseif ($FlashCardContent[0] -eq 'Term,Definition') {
+                            $CardCount = $NumberOfItemsInData - 1
+                        }
                     }
                 }
             }
