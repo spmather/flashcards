@@ -2,7 +2,7 @@
 
 # spmather
 # 2026-08-07
-# v1.0.1
+# v1.0.2
 
 # I have not tested in Windows
 
@@ -182,8 +182,8 @@ function Start-FlashCard {
             "Yellow","White"
         )
 
-        $FlashCardContent    = Get-Content -Path $FilePath
-        $NumberOfItemsInData = (Get-Content -Path $FilePath).Length
+        $FlashCardContent    = @(Get-Content -Path $FilePath)           # If a file has 1 line, (gc /file).length returns the length of the string.  Needs the @ to force type recognition
+        $NumberOfItemsInData = @(Get-Content -Path $FilePath).Length   
 
 
         # I really don't know why I had to make this switch, but $CardCount somewhere in scripting changed from default $null to 0
@@ -191,19 +191,34 @@ function Start-FlashCard {
         # Then I had issues with a single line file cause of indexes starting at 0, which made both a division by 0 issue and immediate
         # failure due to 0 items to print to host.  After longer than I would like to admit, this is the only way I got it to work.
         # I also have to set it to a minimum of 1 to avoid division by 0 errors despite exiting immediately after.
+       
+        
         switch ($NumberOfItemsInData) {
             0 {
-                $CardCount = 1  
+                $CardCount = 1           # cannot set to 0 cause of div by 0 issue
                 Write-Output "File is empty"
                 Exit
             }
             1 {
-                $CardCount = 1  
-                Write-Output "File is empty or too small to process"
-                Exit
+                if ($FlashCardContent[0] -ne 'Term,Definition') {
+                    $CardCount = 1                                 
+                }
+                elseif ($FlashCardContent[0] -eq 'Term,Definition') {
+                    $CardCount = 1      # cannot set to 0 cause of div by 0 issue
+                    Write-Output "File is empty or too small to process"
+                    Exit
+                }  
+            }
+            2 {
+                if ($FlashCardContent[0] -ne 'Term,Definition') {
+                    $CardCount = 2
+                }
+                elseif ($FlashCardContent[0] -eq 'Term,Definition') {
+                    $CardCount = 1
+                }
             }
             Default {
-                if ($NumberOfItemsInData -ge 2) {
+                if ($NumberOfItemsInData -gt 2) {
                     if ($Null -eq $CardCount) {
                         $CardCount = $NumberOfItemsInData
                     }
